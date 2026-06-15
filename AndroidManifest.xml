@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?><manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.hyperion.zedbook">
+
+    <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="28"/>
+
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+
+    <uses-feature android:name="android.hardware.location" android:required="false"/>
+    <uses-feature android:name="android.hardware.location.gps" android:required="false"/>
+    <uses-feature android:name="android.hardware.location.network" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
+
+    <supports-screens android:smallScreens="true" android:normalScreens="true" android:largeScreens="true" android:xlargeScreens="true" android:anyDensity="true"/>
+
+    <application android:allowBackup="true" android:hardwareAccelerated="true" android:theme="@style/AppTheme" android:label="ZedBook" android:icon="@drawable/ic_launcher" android:debuggable="true">
+
+        <activity android:name=".Splashscreen" android:screenOrientation="portrait" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".MainActivity" android:screenOrientation="portrait" android:exported="false"/>
+        <activity android:name=".Loginsignup" android:screenOrientation="portrait" android:exported="false"/>
+        <activity android:name=".Homescreen" android:screenOrientation="portrait" android:exported="false"/>
+        <activity android:name=".Profile" android:screenOrientation="portrait" android:exported="false"/>
+        <activity android:name=".Notifications" android:screenOrientation="portrait" android:exported="false"/>
+        <activity android:name=".Settings" android:screenOrientation="portrait" android:exported="false"/>
+    </application>
+</manifest>

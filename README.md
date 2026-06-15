@@ -47,7 +47,7 @@ target=android-28
 to the SDK platform installed in your AIDE, for example:
 
 ```properties
-target=android-34
+target=android-35
 ```
 
 Keep the min SDK as 21 in AndroidManifest.xml.
