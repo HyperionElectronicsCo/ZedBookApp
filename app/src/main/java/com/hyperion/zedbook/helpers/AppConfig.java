@@ -16,7 +16,7 @@ public final class AppConfig {
        This project uses Firebase REST calls, so it stays AIDE-friendly
        and does not require Firebase SDK jars or Gradle plugins.
     */
-    public static final String FIREBASE_WEB_API_KEY = "yourapikey";
+    public static final String FIREBASE_WEB_API_KEY = "yourapikey-CixXGr9XFk";
     public static final String FIREBASE_DATABASE_URL = "https://yourappname-default-rtdb.europe-west1.firebasedatabase.app";
 
     public static final String VISIBILITY_PUBLIC = "public";

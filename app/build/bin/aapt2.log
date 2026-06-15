@@ -1,0 +1,4 @@
+class com.aide.ui.build.android.AaptService$b
+merged: com.aide.ui.build.android.AaptService$b@6b91495
+aapt2 call compile 56 ms
+aapt2 call link 181ms

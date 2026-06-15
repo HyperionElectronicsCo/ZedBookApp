@@ -1,0 +1,14 @@
+# Referenced at /storage/emulated/0/AppProjects/ZedBookApp/app/build/bin/injected/AndroidManifest.xml:87
+-keep class com.hyperion.zedbook.Homescreen { <init>(); }
+# Referenced at /storage/emulated/0/AppProjects/ZedBookApp/app/build/bin/injected/AndroidManifest.xml:82
+-keep class com.hyperion.zedbook.Loginsignup { <init>(); }
+# Referenced at /storage/emulated/0/AppProjects/ZedBookApp/app/build/bin/injected/AndroidManifest.xml:77
+-keep class com.hyperion.zedbook.MainActivity { <init>(); }
+# Referenced at /storage/emulated/0/AppProjects/ZedBookApp/app/build/bin/injected/AndroidManifest.xml:97
+-keep class com.hyperion.zedbook.Notifications { <init>(); }
+# Referenced at /storage/emulated/0/AppProjects/ZedBookApp/app/build/bin/injected/AndroidManifest.xml:92
+-keep class com.hyperion.zedbook.Profile { <init>(); }
+# Referenced at /storage/emulated/0/AppProjects/ZedBookApp/app/build/bin/injected/AndroidManifest.xml:102
+-keep class com.hyperion.zedbook.Settings { <init>(); }
+# Referenced at /storage/emulated/0/AppProjects/ZedBookApp/app/build/bin/injected/AndroidManifest.xml:60
+-keep class com.hyperion.zedbook.Splashscreen { <init>(); }
