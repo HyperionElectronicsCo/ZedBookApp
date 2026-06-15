@@ -69,13 +69,14 @@ public class Notifications extends BaseSocialActivity implements NotificationAda
 
     private void buildNotificationList() {
         ScrollView sv = new ScrollView(this);
+        installPullToRefresh(sv);
         notificationList = new LinearLayout(this);
         notificationList.setOrientation(LinearLayout.VERTICAL);
         sv.addView(notificationList);
         root.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1));
     }
 
-    private void loadNotifications() {
+    protected void loadNotifications() {
         if (notificationList == null) {
             return;
         }
@@ -97,18 +98,28 @@ public class Notifications extends BaseSocialActivity implements NotificationAda
         }.execute(new Void[0]);
     }
 
+    protected void onPullRefresh() {
+        loadNotifications();
+    }
+
     private void renderNotifications(String s) {
         try {
-            if (s == null || s.equals("null") || s.startsWith("ERR:")) {
+            if (FirebaseHelper.isEmptyFirebaseValue(s)) {
                 NotificationAdapter.render(this, notificationList, null, this);
-                if (s != null && s.startsWith("ERR:")) {
-                    Toast.makeText(this, s, Toast.LENGTH_LONG).show();
-                }
+                return;
+            }
+            if (s.startsWith("ERR:")) {
+                NotificationAdapter.render(this, notificationList, null, this);
+                Toast.makeText(this, "Nothing to see here.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (!FirebaseHelper.looksLikeJsonObject(s)) {
+                NotificationAdapter.render(this, notificationList, null, this);
                 return;
             }
             NotificationAdapter.render(this, notificationList, new JSONObject(s), this);
         } catch (Exception e) {
-            Toast.makeText(this, "Notification parse error: " + e.toString(), Toast.LENGTH_LONG).show();
+            NotificationAdapter.render(this, notificationList, null, this);
         }
     }
 
@@ -144,7 +155,7 @@ public class Notifications extends BaseSocialActivity implements NotificationAda
             protected String doInBackground(Void[] v) {
                 try {
                     String s = FirebaseHelper.getFirebase("notifications/" + session.uid, session.idToken);
-                    if (s == null || s.equals("null") || s.length() < 3) {
+                    if (FirebaseHelper.isEmptyFirebaseValue(s) || s.length() < 3 || !FirebaseHelper.looksLikeJsonObject(s)) {
                         return "OK";
                     }
                     JSONObject all = new JSONObject(s);

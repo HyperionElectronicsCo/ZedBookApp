@@ -100,18 +100,28 @@ public class Settings extends Activity {
     }
 
     private void editProfileName() {
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(LinearLayout.VERTICAL);
         final EditText e = new EditText(this);
         e.setSingleLine(true);
         e.setHint("Display name");
         e.setText(session.displayName);
-        new AlertDialog.Builder(this).setTitle("Edit profile name").setView(e).setPositiveButton("Save", new DialogInterface.OnClickListener() {
+        TextView note = Ui.text(this, "Names can only be changed once every 6 months. A public status will tell everyone about the change.", 12, AppConfig.MUTED, Typeface.NORMAL);
+        note.setPadding(Ui.dp(this, 12), Ui.dp(this, 8), Ui.dp(this, 12), Ui.dp(this, 8));
+        l.addView(e, new LinearLayout.LayoutParams(-1, Ui.dp(this, 54)));
+        l.addView(note, new LinearLayout.LayoutParams(-1, Ui.dp(this, 70)));
+        new AlertDialog.Builder(this).setTitle("Edit profile name").setView(l).setPositiveButton("Save", new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface d, int w) {
                 String n = e.getText().toString().trim();
                 if (n.length() == 0) {
                     n = "ZedBook User";
                 }
-                session.saveProfile(n, session.profileImage64);
-                saveProfileAndRefresh();
+                String old = session.displayName == null ? "" : session.displayName;
+                if (!old.equals(n)) {
+                    changeNameAndRefresh(old, n);
+                } else {
+                    saveProfileAndRefresh();
+                }
             }
         }).setNegativeButton("Cancel", null).show();
     }
@@ -155,6 +165,27 @@ public class Settings extends Activity {
                     Toast.makeText(Settings.this, s, Toast.LENGTH_LONG).show();
                     return;
                 }
+                buildSettings();
+            }
+        }.execute(new Void[0]);
+    }
+
+    private void changeNameAndRefresh(final String oldName, final String newName) {
+        new AsyncTask<Void, Void, String>() {
+            protected String doInBackground(Void[] v) {
+                try {
+                    return PostService.changeName(session, oldName, newName);
+                } catch (Exception e) {
+                    return "ERR:" + e.getMessage();
+                }
+            }
+            protected void onPostExecute(String s) {
+                if (s != null && s.startsWith("ERR:")) {
+                    Toast.makeText(Settings.this, s.substring(4), Toast.LENGTH_LONG).show();
+                    return;
+                }
+                session.saveProfile(newName, session.profileImage64);
+                Toast.makeText(Settings.this, "Name changed and status posted", Toast.LENGTH_LONG).show();
                 buildSettings();
             }
         }.execute(new Void[0]);

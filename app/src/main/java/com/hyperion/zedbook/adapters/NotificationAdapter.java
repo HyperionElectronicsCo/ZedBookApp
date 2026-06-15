@@ -31,7 +31,7 @@ public class NotificationAdapter {
         list.removeAllViews();
         try {
             if (all == null) {
-                empty(c, list, "No notifications yet.");
+                empty(c, list, "Nothing to see here.");
                 return;
             }
             ArrayList<String> keys = new ArrayList<String>();
@@ -51,14 +51,14 @@ public class NotificationAdapter {
                 }
             });
             if (keys.size() == 0) {
-                empty(c, list, "No notifications yet.");
+                empty(c, list, "Nothing to see here.");
                 return;
             }
             for (int i = 0; i < keys.size(); i++) {
                 addCard(c, list, keys.get(i), all.getJSONObject(keys.get(i)), listener);
             }
         } catch (Exception e) {
-            empty(c, list, "Notification error: " + e.toString());
+            empty(c, list, "Nothing to see here.");
         }
     }
 

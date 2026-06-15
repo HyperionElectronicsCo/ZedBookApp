@@ -26,17 +26,18 @@ import java.util.Iterator;
 public class PostAdapter {
     public interface PostActionListener {
         void onEditPost(String postId, JSONObject post);
+        void onDeletePost(String postId, JSONObject post);
         void onReactPost(String postId, String type);
         void onCommentPost(String postId, JSONObject post);
         void onOpenVideo(String uri);
         void onOpenLocation(String locationText);
     }
 
-    public static void render(final Context c, LinearLayout list, final JSONObject all, final String currentUid, boolean onlyMine, final PostActionListener listener) {
+    public static void render(final Context c, LinearLayout list, final JSONObject all, final String currentUid, boolean onlyMine, final JSONObject friends, final String profileUid, final PostActionListener listener) {
         list.removeAllViews();
         try {
             if (all == null) {
-                empty(c, list, onlyMine ? "You have not posted a status yet." : "No statuses yet. Be the first to post.");
+                empty(c, list, emptyText(onlyMine, profileUid));
                 return;
             }
             ArrayList<String> keys = new ArrayList<String>();
@@ -44,10 +45,8 @@ public class PostAdapter {
             while (it.hasNext()) {
                 String k = it.next();
                 JSONObject p = all.optJSONObject(k);
-                if (p != null) {
-                    if (!onlyMine || currentUid.equals(p.optString("uid", ""))) {
-                        keys.add(k);
-                    }
+                if (p != null && shouldShowPost(p, currentUid, onlyMine, friends, profileUid)) {
+                    keys.add(k);
                 }
             }
             Collections.sort(keys, new Comparator<String>() {
@@ -62,7 +61,7 @@ public class PostAdapter {
                 }
             });
             if (keys.size() == 0) {
-                empty(c, list, onlyMine ? "You have not posted a status yet." : "No statuses yet. Be the first to post.");
+                empty(c, list, emptyText(onlyMine, profileUid));
                 return;
             }
             for (int i = 0; i < keys.size(); i++) {
@@ -72,6 +71,50 @@ public class PostAdapter {
         } catch (Exception e) {
             empty(c, list, "Feed error: " + e.toString());
         }
+    }
+
+    private static String emptyText(boolean onlyMine, String profileUid) {
+        if (profileUid != null && profileUid.length() > 0) {
+            return "No visible statuses yet.";
+        }
+        return onlyMine ? "You have not posted a status yet." : "No statuses yet. Be the first to post.";
+    }
+
+    private static boolean shouldShowPost(JSONObject p, String currentUid, boolean onlyMine, JSONObject friends, String profileUid) {
+        String uid = p.optString("uid", "");
+        String vis = p.optString("visibility", AppConfig.VISIBILITY_PUBLIC);
+        if (vis.length() == 0) {
+            vis = AppConfig.VISIBILITY_PUBLIC;
+        }
+
+        if (profileUid != null && profileUid.length() > 0) {
+            if (!profileUid.equals(uid)) {
+                return false;
+            }
+            return canViewerSeePost(currentUid, uid, vis, friends, true);
+        }
+
+        if (onlyMine) {
+            return currentUid.equals(uid);
+        }
+
+        if (currentUid.equals(uid)) {
+            return !AppConfig.VISIBILITY_ONLY_ME.equals(vis);
+        }
+        return canViewerSeePost(currentUid, uid, vis, friends, false);
+    }
+
+    private static boolean canViewerSeePost(String currentUid, String postUid, String visibility, JSONObject friends, boolean onProfile) {
+        if (currentUid.equals(postUid)) {
+            return true;
+        }
+        if (AppConfig.VISIBILITY_PUBLIC.equals(visibility)) {
+            return true;
+        }
+        if (AppConfig.VISIBILITY_FRIENDS.equals(visibility)) {
+            return friends != null && friends.optBoolean(postUid, false);
+        }
+        return false;
     }
 
     private static void empty(Context c, LinearLayout list, String msg) {
@@ -97,20 +140,30 @@ public class PostAdapter {
         if (p.optBoolean("edited", false)) {
             timeText = timeText + "  Edited";
         }
-        TextView time = Ui.text(c, timeText, 12, Color.GRAY, Typeface.NORMAL);
+        String visibilityText = visibilityLabel(p.optString("visibility", AppConfig.VISIBILITY_PUBLIC));
+        TextView time = Ui.text(c, timeText + "  •  " + visibilityText, 12, Color.GRAY, Typeface.NORMAL);
         headText.addView(name, new LinearLayout.LayoutParams(-1, Ui.dp(c, 25)));
         headText.addView(time, new LinearLayout.LayoutParams(-1, Ui.dp(c, 22)));
         head.addView(headText, new LinearLayout.LayoutParams(0, Ui.dp(c, 50), 1));
 
         if (currentUid.equals(p.optString("uid", ""))) {
-            Button edit = Ui.button(c, "Edit", R.drawable.bg_blue_button);
+            Button edit = Ui.button(c, "", R.drawable.bg_blue_button);
             edit.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_edit, 0, 0, 0);
             edit.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
                     listener.onEditPost(postId, p);
                 }
             });
-            head.addView(edit, new LinearLayout.LayoutParams(Ui.dp(c, 82), Ui.dp(c, 42)));
+            head.addView(edit, new LinearLayout.LayoutParams(Ui.dp(c, 44), Ui.dp(c, 42)));
+
+            Button del = Ui.button(c, "", R.drawable.bg_grey_button);
+            del.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_delete, 0, 0, 0);
+            del.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    listener.onDeletePost(postId, p);
+                }
+            });
+            head.addView(del, new LinearLayout.LayoutParams(Ui.dp(c, 44), Ui.dp(c, 42)));
         }
         card.addView(head, new LinearLayout.LayoutParams(-1, Ui.dp(c, 52)));
 
@@ -196,6 +249,16 @@ public class PostAdapter {
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
         cp.setMargins(Ui.dp(c, 8), Ui.dp(c, 8), Ui.dp(c, 8), 0);
         list.addView(card, cp);
+    }
+
+    private static String visibilityLabel(String visibility) {
+        if (AppConfig.VISIBILITY_FRIENDS.equals(visibility)) {
+            return "Friends";
+        }
+        if (AppConfig.VISIBILITY_ONLY_ME.equals(visibility)) {
+            return "Only me";
+        }
+        return "Public";
     }
 
     private static int count(JSONObject p, String type) {

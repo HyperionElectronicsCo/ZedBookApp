@@ -18,17 +18,77 @@ import com.hyperion.zedbook.helpers.PostService;
 import com.hyperion.zedbook.helpers.Ui;
 
 public class Profile extends BaseSocialActivity {
+    private String viewedUid = "";
+    private String viewedName = "";
+    private String viewedEmail = "";
+    private String viewedProfile = "";
+
     public void onCreate(Bundle b) {
         super.onCreate(b);
         if (!prepareSession()) {
             return;
         }
+        viewedUid = getIntent().getStringExtra("profileUid");
+        if (viewedUid == null) {
+            viewedUid = "";
+        }
+        if (viewedUid.length() > 0 && !viewedUid.equals(session.uid)) {
+            viewedName = getIntent().getStringExtra("profileName");
+            viewedEmail = getIntent().getStringExtra("profileEmail");
+            viewedProfile = getIntent().getStringExtra("profileImage");
+            if (viewedName == null || viewedName.length() == 0) {
+                viewedName = "ZedBook User";
+            }
+            if (viewedEmail == null) {
+                viewedEmail = "";
+            }
+            if (viewedProfile == null) {
+                viewedProfile = "";
+            }
+            feedProfileUid = viewedUid;
+            buildChrome("Profile", 1);
+            buildViewedProfileHeader();
+            addSectionHeader("Public Profile", "Public statuses show to everyone. Friends-only statuses show if you are friends.");
+            buildFeedHolder();
+            loadPosts(false);
+            return;
+        }
+
         buildChrome("Profile", 1);
         buildProfileHeader();
         buildComposer("Post something to your profile...");
-        addSectionHeader("My Statuses", "Everything you have posted from home or profile.");
+        addSectionHeader("My Statuses", "Everything you have posted from home or profile, including Only me notes.");
         buildFeedHolder();
         loadPosts(true);
+    }
+
+    private void buildViewedProfileHeader() {
+        LinearLayout profile = new LinearLayout(this);
+        profile.setOrientation(LinearLayout.HORIZONTAL);
+        profile.setGravity(Gravity.CENTER_VERTICAL);
+        profile.setPadding(Ui.dp(this, 10), Ui.dp(this, 8), Ui.dp(this, 10), Ui.dp(this, 8));
+        profile.setBackgroundResource(R.drawable.bg_card);
+        profile.addView(Ui.avatar(this, 76, viewedProfile), new LinearLayout.LayoutParams(Ui.dp(this, 76), Ui.dp(this, 76)));
+
+        LinearLayout names = new LinearLayout(this);
+        names.setOrientation(LinearLayout.VERTICAL);
+        TextView n = Ui.text(this, viewedName, 20, AppConfig.TEXT, Typeface.BOLD);
+        TextView em = Ui.text(this, viewedEmail, 13, AppConfig.MUTED, Typeface.NORMAL);
+        TextView helper = Ui.text(this, "Profile and visible statuses", 12, AppConfig.MUTED, Typeface.NORMAL);
+        names.addView(n, new LinearLayout.LayoutParams(-1, Ui.dp(this, 30)));
+        names.addView(em, new LinearLayout.LayoutParams(-1, Ui.dp(this, 24)));
+        names.addView(helper, new LinearLayout.LayoutParams(-1, Ui.dp(this, 24)));
+        profile.addView(names, new LinearLayout.LayoutParams(0, Ui.dp(this, 82), 1));
+
+        Button add = Ui.button(this, "Add", R.drawable.bg_blue_button);
+        add.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_friend_add, 0, 0, 0);
+        add.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                onAddFriend(viewedUid, viewedName);
+            }
+        });
+        profile.addView(add, new LinearLayout.LayoutParams(Ui.dp(this, 82), Ui.dp(this, 44)));
+        root.addView(profile, new LinearLayout.LayoutParams(-1, Ui.dp(this, 100)));
     }
 
     private void buildProfileHeader() {
@@ -49,14 +109,14 @@ public class Profile extends BaseSocialActivity {
         names.addView(helper, new LinearLayout.LayoutParams(-1, Ui.dp(this, 24)));
         profile.addView(names, new LinearLayout.LayoutParams(0, Ui.dp(this, 82), 1));
 
-        Button edit = Ui.button(this, "Edit", R.drawable.bg_blue_button);
+        Button edit = Ui.button(this, "", R.drawable.bg_blue_button);
         edit.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_edit, 0, 0, 0);
         edit.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 showProfileDialog();
             }
         });
-        profile.addView(edit, new LinearLayout.LayoutParams(Ui.dp(this, 82), Ui.dp(this, 44)));
+        profile.addView(edit, new LinearLayout.LayoutParams(Ui.dp(this, 52), Ui.dp(this, 44)));
         root.addView(profile, new LinearLayout.LayoutParams(-1, Ui.dp(this, 100)));
     }
 
@@ -70,6 +130,8 @@ public class Profile extends BaseSocialActivity {
         name.setSingleLine(true);
         name.setText(session.displayName);
         l.addView(name, new LinearLayout.LayoutParams(-1, Ui.dp(this, 54)));
+        TextView limit = Ui.text(this, "Names can only be changed once every 6 months.", 12, AppConfig.MUTED, Typeface.NORMAL);
+        l.addView(limit, new LinearLayout.LayoutParams(-1, Ui.dp(this, 36)));
         Button pic = Ui.button(this, "Change profile picture", R.drawable.bg_blue_button);
         pic.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_picture, 0, 0, 0);
         l.addView(pic, new LinearLayout.LayoutParams(-1, Ui.dp(this, 48)));
@@ -84,8 +146,15 @@ public class Profile extends BaseSocialActivity {
                 if (newName.length() == 0) {
                     newName = "ZedBook User";
                 }
-                session.saveProfile(newName, session.profileImage64);
-                saveMyProfileAndRefresh();
+                String oldName = session.displayName;
+                if (oldName == null) {
+                    oldName = "";
+                }
+                if (!oldName.equals(newName)) {
+                    changeNameAndRefresh(oldName, newName);
+                } else {
+                    saveMyProfileAndRefresh();
+                }
             }
         }).setNegativeButton("Cancel", null).show();
     }
@@ -113,6 +182,28 @@ public class Profile extends BaseSocialActivity {
                     Toast.makeText(Profile.this, s, Toast.LENGTH_LONG).show();
                     return;
                 }
+                startActivity(getIntent());
+                finish();
+            }
+        }.execute(new Void[0]);
+    }
+
+    private void changeNameAndRefresh(final String oldName, final String newName) {
+        new AsyncTask<Void, Void, String>() {
+            protected String doInBackground(Void[] v) {
+                try {
+                    return PostService.changeName(session, oldName, newName);
+                } catch (Exception e) {
+                    return "ERR:" + e.getMessage();
+                }
+            }
+            protected void onPostExecute(String s) {
+                if (s != null && s.startsWith("ERR:")) {
+                    Toast.makeText(Profile.this, s.substring(4), Toast.LENGTH_LONG).show();
+                    return;
+                }
+                session.saveProfile(newName, session.profileImage64);
+                Toast.makeText(Profile.this, "Name changed and status posted", Toast.LENGTH_LONG).show();
                 startActivity(getIntent());
                 finish();
             }

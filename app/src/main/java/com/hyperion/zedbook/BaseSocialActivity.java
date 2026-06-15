@@ -9,7 +9,11 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
+import android.text.InputType;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -36,12 +40,21 @@ public class BaseSocialActivity extends Activity implements PostAdapter.PostActi
     protected LinearLayout feedList;
     protected EditText statusBox;
     protected Button activePostButton;
+    protected Button publicButton;
+    protected Button friendsButton;
+    protected Button onlyMeButton;
 
     protected String pendingImage64 = "";
     protected String pendingVideoUri = "";
     protected String pendingLocation = "";
+    protected String pendingVisibility = AppConfig.VISIBILITY_PUBLIC;
     protected String editingPostId = null;
     protected boolean feedOnlyMine = false;
+    protected String feedProfileUid = "";
+    protected JSONObject currentFriends = new JSONObject();
+
+    private float pullStartY = 0;
+    private boolean pullArmed = false;
 
     public void onCreate(Bundle b) {
         super.onCreate(b);
@@ -119,7 +132,11 @@ public class BaseSocialActivity extends Activity implements PostAdapter.PostActi
         b.setCompoundDrawablesWithIntrinsicBounds(icon, 0, 0, 0);
         b.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                if (!BaseSocialActivity.this.getClass().equals(cls)) {
+                boolean open = !BaseSocialActivity.this.getClass().equals(cls);
+                if (!open && cls.equals(Profile.class) && feedProfileUid != null && feedProfileUid.length() > 0) {
+                    open = true;
+                }
+                if (open) {
                     startActivity(new Intent(BaseSocialActivity.this, cls));
                     finish();
                 }
@@ -153,10 +170,25 @@ public class BaseSocialActivity extends Activity implements PostAdapter.PostActi
         statusBox.setSingleLine(false);
         statusBox.setMinLines(1);
         statusBox.setMaxLines(3);
+        statusBox.setRawInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        statusBox.setImeOptions(EditorInfo.IME_ACTION_SEND);
         statusBox.setTextColor(AppConfig.TEXT);
         statusBox.setHintTextColor(android.graphics.Color.rgb(120, 125, 130));
         statusBox.setBackgroundResource(R.drawable.bg_input_light);
         statusBox.setPadding(Ui.dp(this, 12), 0, Ui.dp(this, 12), 0);
+        statusBox.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+                boolean enterReleased = false;
+                if (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER && event.getAction() == KeyEvent.ACTION_UP) {
+                    enterReleased = true;
+                }
+                if (actionId == EditorInfo.IME_ACTION_SEND || actionId == EditorInfo.IME_ACTION_DONE || enterReleased) {
+                    saveStatus();
+                    return true;
+                }
+                return false;
+            }
+        });
         composer.addView(statusBox, new LinearLayout.LayoutParams(0, Ui.dp(this, 50), 1));
 
         activePostButton = Ui.button(this, "Post", R.drawable.bg_blue_button);
@@ -179,6 +211,8 @@ public class BaseSocialActivity extends Activity implements PostAdapter.PostActi
         attach.addView(loc, new LinearLayout.LayoutParams(0, Ui.dp(this, 40), 1));
         attach.addView(clear, new LinearLayout.LayoutParams(0, Ui.dp(this, 40), 1));
         root.addView(attach, new LinearLayout.LayoutParams(-1, Ui.dp(this, 48)));
+
+        buildVisibilityChooser();
 
         activePostButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -208,12 +242,87 @@ public class BaseSocialActivity extends Activity implements PostAdapter.PostActi
         });
     }
 
+    private void buildVisibilityChooser() {
+        LinearLayout row = new LinearLayout(this);
+        row.setPadding(Ui.dp(this, 8), 0, Ui.dp(this, 8), Ui.dp(this, 6));
+        row.setBackgroundResource(R.drawable.bg_card);
+        TextView label = Ui.text(this, "Visibility", 12, AppConfig.MUTED, Typeface.BOLD);
+        publicButton = Ui.button(this, "Public", R.drawable.bg_blue_button);
+        friendsButton = Ui.button(this, "Friends", R.drawable.bg_grey_button);
+        onlyMeButton = Ui.button(this, "Only me", R.drawable.bg_grey_button);
+        row.addView(label, new LinearLayout.LayoutParams(Ui.dp(this, 76), Ui.dp(this, 40)));
+        row.addView(publicButton, new LinearLayout.LayoutParams(0, Ui.dp(this, 40), 1));
+        row.addView(friendsButton, new LinearLayout.LayoutParams(0, Ui.dp(this, 40), 1));
+        row.addView(onlyMeButton, new LinearLayout.LayoutParams(0, Ui.dp(this, 40), 1));
+        root.addView(row, new LinearLayout.LayoutParams(-1, Ui.dp(this, 48)));
+        publicButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                selectVisibility(AppConfig.VISIBILITY_PUBLIC);
+            }
+        });
+        friendsButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                selectVisibility(AppConfig.VISIBILITY_FRIENDS);
+            }
+        });
+        onlyMeButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                selectVisibility(AppConfig.VISIBILITY_ONLY_ME);
+            }
+        });
+        selectVisibility(AppConfig.VISIBILITY_PUBLIC);
+    }
+
+    protected void selectVisibility(String visibility) {
+        if (visibility == null || visibility.length() == 0) {
+            visibility = AppConfig.VISIBILITY_PUBLIC;
+        }
+        if (!AppConfig.VISIBILITY_FRIENDS.equals(visibility) && !AppConfig.VISIBILITY_ONLY_ME.equals(visibility)) {
+            visibility = AppConfig.VISIBILITY_PUBLIC;
+        }
+        pendingVisibility = visibility;
+        if (publicButton != null) {
+            publicButton.setBackgroundResource(AppConfig.VISIBILITY_PUBLIC.equals(visibility) ? R.drawable.bg_blue_button : R.drawable.bg_grey_button);
+        }
+        if (friendsButton != null) {
+            friendsButton.setBackgroundResource(AppConfig.VISIBILITY_FRIENDS.equals(visibility) ? R.drawable.bg_blue_button : R.drawable.bg_grey_button);
+        }
+        if (onlyMeButton != null) {
+            onlyMeButton.setBackgroundResource(AppConfig.VISIBILITY_ONLY_ME.equals(visibility) ? R.drawable.bg_blue_button : R.drawable.bg_grey_button);
+        }
+    }
+
     protected void buildFeedHolder() {
         ScrollView sv = new ScrollView(this);
+        installPullToRefresh(sv);
         feedList = new LinearLayout(this);
         feedList.setOrientation(LinearLayout.VERTICAL);
         sv.addView(feedList);
         root.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1));
+    }
+
+    protected void installPullToRefresh(final ScrollView sv) {
+        sv.setOnTouchListener(new View.OnTouchListener() {
+            public boolean onTouch(View v, MotionEvent event) {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    pullStartY = event.getY();
+                    pullArmed = sv.getScrollY() == 0;
+                } else if (event.getAction() == MotionEvent.ACTION_UP) {
+                    if (pullArmed && sv.getScrollY() == 0 && event.getY() - pullStartY > Ui.dp(BaseSocialActivity.this, 70)) {
+                        toast("Refreshing...");
+                        onPullRefresh();
+                    }
+                    pullArmed = false;
+                } else if (event.getAction() == MotionEvent.ACTION_CANCEL) {
+                    pullArmed = false;
+                }
+                return false;
+            }
+        });
+    }
+
+    protected void onPullRefresh() {
+        loadPosts(feedOnlyMine);
     }
 
     protected void loadPosts(final boolean onlyMine) {
@@ -228,7 +337,12 @@ public class BaseSocialActivity extends Activity implements PostAdapter.PostActi
         new AsyncTask<Void, Void, String>() {
             protected String doInBackground(Void[] v) {
                 try {
-                    return FirebaseHelper.getFirebase("posts", session.idToken);
+                    String posts = FirebaseHelper.getFirebase("posts", session.idToken);
+                    String friends = FirebaseHelper.getFirebase("friends/" + session.uid, session.idToken);
+                    JSONObject wrap = new JSONObject();
+                    wrap.put("posts", posts == null ? "null" : posts);
+                    wrap.put("friends", friends == null ? "null" : friends);
+                    return wrap.toString();
                 } catch (Exception e) {
                     return "ERR:" + e.toString();
                 }
@@ -241,16 +355,33 @@ public class BaseSocialActivity extends Activity implements PostAdapter.PostActi
 
     protected void renderPostString(String s, boolean onlyMine) {
         try {
-            if (s == null || s.equals("null") || s.startsWith("ERR:")) {
-                PostAdapter.render(this, feedList, null, session.uid, onlyMine, this);
+            if (s == null || s.startsWith("ERR:")) {
+                PostAdapter.render(this, feedList, null, session.uid, onlyMine, currentFriends, feedProfileUid, this);
                 if (s != null && s.startsWith("ERR:")) {
                     toast(s);
                 }
                 return;
             }
-            JSONObject all = new JSONObject(s);
-            PostAdapter.render(this, feedList, all, session.uid, onlyMine, this);
+            JSONObject wrap = new JSONObject(s);
+            String friendsRaw = wrap.optString("friends", "null");
+            currentFriends = new JSONObject();
+            if (!FirebaseHelper.isEmptyFirebaseValue(friendsRaw) && FirebaseHelper.looksLikeJsonObject(friendsRaw)) {
+                currentFriends = new JSONObject(friendsRaw);
+            }
+            String postsRaw = wrap.optString("posts", "null");
+            if (FirebaseHelper.isEmptyFirebaseValue(postsRaw)) {
+                PostAdapter.render(this, feedList, null, session.uid, onlyMine, currentFriends, feedProfileUid, this);
+                return;
+            }
+            if (!FirebaseHelper.looksLikeJsonObject(postsRaw)) {
+                PostAdapter.render(this, feedList, null, session.uid, onlyMine, currentFriends, feedProfileUid, this);
+                toast("Feed could not load. Check the Firebase Realtime Database URL and rules.");
+                return;
+            }
+            JSONObject all = new JSONObject(postsRaw);
+            PostAdapter.render(this, feedList, all, session.uid, onlyMine, currentFriends, feedProfileUid, this);
         } catch (Exception e) {
+            PostAdapter.render(this, feedList, null, session.uid, onlyMine, currentFriends, feedProfileUid, this);
             toast("Feed parse error: " + e.toString());
         }
     }
@@ -265,19 +396,30 @@ public class BaseSocialActivity extends Activity implements PostAdapter.PostActi
             return;
         }
         final String postId = editingPostId;
+        final String vis = pendingVisibility;
+        if (activePostButton != null) {
+            activePostButton.setEnabled(false);
+            activePostButton.setText(postId != null && postId.length() > 0 ? "Saving..." : "Posting...");
+        }
         new AsyncTask<Void, Void, String>() {
             protected String doInBackground(Void[] v) {
                 try {
                     if (postId != null && postId.length() > 0) {
-                        return PostService.updatePost(session, postId, text, pendingImage64, pendingVideoUri, pendingLocation);
+                        return PostService.updatePost(session, postId, text, pendingImage64, pendingVideoUri, pendingLocation, vis);
                     }
-                    return PostService.createPost(session, text, pendingImage64, pendingVideoUri, pendingLocation);
+                    return PostService.createPost(session, text, pendingImage64, pendingVideoUri, pendingLocation, vis);
                 } catch (Exception e) {
                     return "ERR:" + e.toString();
                 }
             }
             protected void onPostExecute(String s) {
+                if (activePostButton != null) {
+                    activePostButton.setEnabled(true);
+                }
                 if (s != null && s.startsWith("ERR:")) {
+                    if (activePostButton != null) {
+                        activePostButton.setText(postId != null && postId.length() > 0 ? "Save" : "Post");
+                    }
                     toast(s);
                     return;
                 }
@@ -292,6 +434,7 @@ public class BaseSocialActivity extends Activity implements PostAdapter.PostActi
         pendingImage64 = "";
         pendingVideoUri = "";
         pendingLocation = "";
+        selectVisibility(AppConfig.VISIBILITY_PUBLIC);
         if (statusBox != null) {
             statusBox.setText("");
         }
@@ -349,9 +492,38 @@ public class BaseSocialActivity extends Activity implements PostAdapter.PostActi
         pendingImage64 = post.optString("image", "");
         pendingVideoUri = post.optString("video", "");
         pendingLocation = post.optString("location", "");
-        activePostButton.setText("Save Edit");
+        selectVisibility(post.optString("visibility", AppConfig.VISIBILITY_PUBLIC));
+        activePostButton.setText("Save");
         activePostButton.setBackgroundResource(R.drawable.bg_green_button);
-        toast("Edit the status, then press Save Edit.");
+        toast("Edit the status, then press Save.");
+    }
+
+    public void onDeletePost(final String postId, JSONObject post) {
+        new AlertDialog.Builder(this).setTitle("Delete status?").setMessage("This will remove the status and its comments permanently.").setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface d, int w) {
+                deletePostNow(postId);
+            }
+        }).setNegativeButton("Cancel", null).show();
+    }
+
+    private void deletePostNow(final String postId) {
+        new AsyncTask<Void, Void, String>() {
+            protected String doInBackground(Void[] v) {
+                try {
+                    return PostService.deletePost(session, postId);
+                } catch (Exception e) {
+                    return "ERR:" + e.toString();
+                }
+            }
+            protected void onPostExecute(String s) {
+                if (s != null && s.startsWith("ERR:")) {
+                    toast(s);
+                    return;
+                }
+                resetComposer();
+                loadPosts(feedOnlyMine);
+            }
+        }.execute(new Void[0]);
     }
 
     public void onReactPost(final String postId, final String type) {
@@ -473,8 +645,18 @@ public class BaseSocialActivity extends Activity implements PostAdapter.PostActi
             }
             protected void onPostExecute(String s) {
                 toast(s != null && s.startsWith("ERR:") ? s : targetName + " added");
+                loadPosts(feedOnlyMine);
             }
         }.execute(new Void[0]);
+    }
+
+    public void onViewProfile(String targetUid, String targetName, String targetEmail, String targetProfile) {
+        Intent i = new Intent(this, Profile.class);
+        i.putExtra("profileUid", targetUid);
+        i.putExtra("profileName", targetName);
+        i.putExtra("profileEmail", targetEmail);
+        i.putExtra("profileImage", targetProfile);
+        startActivity(i);
     }
 
     protected void inviteFriends() {

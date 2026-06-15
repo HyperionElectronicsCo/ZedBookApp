@@ -20,6 +20,7 @@ import java.util.Locale;
 public class UserAdapter {
     public interface UserActionListener {
         void onAddFriend(String targetUid, String targetName);
+        void onViewProfile(String targetUid, String targetName, String targetEmail, String targetProfile);
     }
 
     public static void render(Context c, LinearLayout results, JSONObject users, String query, String myUid, final UserActionListener listener) {
@@ -42,11 +43,12 @@ public class UserAdapter {
                     continue;
                 }
                 final String name = u.optString("name", "ZedBook User");
-                String email = u.optString("email", "");
+                final String email = u.optString("email", "");
+                final String profile = u.optString("profile", "");
                 String hay = (name + " " + email).toLowerCase(Locale.US);
                 if (q.length() == 0 || hay.indexOf(q) >= 0) {
                     count++;
-                    addRow(c, results, uid, name, email, u.optString("profile", ""), listener);
+                    addRow(c, results, uid, name, email, profile, listener);
                 }
             }
             if (count == 0) {
@@ -57,7 +59,7 @@ public class UserAdapter {
         }
     }
 
-    private static void addRow(Context c, LinearLayout results, final String uid, final String name, String email, String profile, final UserActionListener listener) {
+    private static void addRow(Context c, LinearLayout results, final String uid, final String name, final String email, final String profile, final UserActionListener listener) {
         LinearLayout row = new LinearLayout(c);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(Ui.dp(c, 8), Ui.dp(c, 8), Ui.dp(c, 8), Ui.dp(c, 8));
@@ -69,6 +71,15 @@ public class UserAdapter {
         texts.addView(Ui.text(c, name, 16, AppConfig.TEXT, Typeface.BOLD), new LinearLayout.LayoutParams(-1, Ui.dp(c, 25)));
         texts.addView(Ui.text(c, email, 12, AppConfig.MUTED, Typeface.NORMAL), new LinearLayout.LayoutParams(-1, Ui.dp(c, 22)));
         row.addView(texts, new LinearLayout.LayoutParams(0, Ui.dp(c, 48), 1));
+
+        Button view = Ui.button(c, "View", R.drawable.bg_grey_button);
+        view.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_profile, 0, 0, 0);
+        view.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                listener.onViewProfile(uid, name, email, profile);
+            }
+        });
+        row.addView(view, new LinearLayout.LayoutParams(Ui.dp(c, 76), Ui.dp(c, 42)));
 
         Button add = Ui.button(c, "Add", R.drawable.bg_blue_button);
         add.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_friend_add, 0, 0, 0);

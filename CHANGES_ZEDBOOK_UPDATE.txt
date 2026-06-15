@@ -1,0 +1,21 @@
+ZedBook update
+==============
+
+Changes included in this build:
+
+- Status owner controls now show the edit icon only, without the word "Edit".
+- Posters can delete their own statuses with a confirmation dialog.
+- Home/profile feed supports pull-down refresh using the existing AIDE-compatible Android widgets.
+- Alerts/notifications supports pull-down refresh.
+- Composer now includes visibility options: Public, Friends, and Only me.
+- Public posts are visible to everyone.
+- Friends posts are visible to the poster and friends.
+- Only me posts are shown only on the poster's own profile.
+- Search results now include View so users can open another registered user's profile.
+- Viewing another profile shows public posts, plus friends-only posts when the viewer is friends with that user.
+- Name changes update all old statuses by that user.
+- Name changes create a public status announcing the change.
+- Name changes are limited to once every 6 months.
+- Firebase Realtime Database URL is set to the Europe regional database URL.
+
+Still Java-only, no lambdas, and kept the root AIDE project structure plus the app/ Gradle-style mirror.
